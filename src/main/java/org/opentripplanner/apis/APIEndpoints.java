@@ -7,6 +7,7 @@ import static org.opentripplanner.framework.application.OTPFeature.ActuatorAPI;
 import static org.opentripplanner.framework.application.OTPFeature.DebugUi;
 import static org.opentripplanner.framework.application.OTPFeature.GtfsGraphQlApi;
 import static org.opentripplanner.framework.application.OTPFeature.LegacyRestApi;
+import static org.opentripplanner.framework.application.OTPFeature.OJPApi;
 import static org.opentripplanner.framework.application.OTPFeature.ReportApi;
 import static org.opentripplanner.framework.application.OTPFeature.SandboxAPIGeocoder;
 import static org.opentripplanner.framework.application.OTPFeature.SandboxAPIMapboxVectorTilesApi;
@@ -26,6 +27,7 @@ import org.opentripplanner.apis.transmodel.TransmodelAPI;
 import org.opentripplanner.apis.vectortiles.GraphInspectorVectorTileResource;
 import org.opentripplanner.ext.actuator.ActuatorAPI;
 import org.opentripplanner.ext.geocoder.GeocoderResource;
+import org.opentripplanner.ext.ojp.OJPResource;
 import org.opentripplanner.ext.parkAndRideApi.ParkAndRideResource;
 import org.opentripplanner.ext.reportapi.resource.ReportResource;
 import org.opentripplanner.ext.restapi.resources.BikeRental;
@@ -51,6 +53,7 @@ public class APIEndpoints {
     addIfEnabled(DebugUi, GraphInspectorTileResource.class);
     addIfEnabled(DebugUi, GraphInspectorVectorTileResource.class);
     addIfEnabled(GtfsGraphQlApi, GtfsGraphQLAPI.class);
+    addIfEnabled(OJPApi, OJPResource.class);
     // scheduled to be removed and only here for backwards compatibility
     addIfEnabled(GtfsGraphQlApi, GtfsGraphQLAPI.GtfsGraphQLAPIOldPath.class);
     addIfEnabled(TransmodelGraphQlApi, TransmodelAPI.class);
