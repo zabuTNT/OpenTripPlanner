@@ -406,7 +406,7 @@ public class OJPTripInfoFactory {
 
 	private Trip trip(String tripId) {
 		var trip = transitService().getTripForId(createId("tripId", tripId));
-		return CommonOJP.validateExist("Trip", trip, "tripId", tripId);
+		return OJPCommon.validateExist("Trip", trip, "tripId", tripId);
 	}
 
 	

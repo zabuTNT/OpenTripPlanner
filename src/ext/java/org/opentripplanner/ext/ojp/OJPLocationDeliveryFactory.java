@@ -70,8 +70,8 @@ public class OJPLocationDeliveryFactory {
 	}
 
 	private StopLocation stop(String stopId) {
-		var stop = transitService().getRegularStop(CommonOJP.createId("stopId", stopId));
-		return CommonOJP.validateExist("Stop", stop, "stopId", stop);
+		var stop = transitService().getRegularStop(OJPCommon.createId("stopId", stopId));
+		return OJPCommon.validateExist("Stop", stop, "stopId", stop);
 	}
 
 	public OJPLocationInformationDeliveryStructure create() {
@@ -182,7 +182,7 @@ public class OJPLocationDeliveryFactory {
 			if(!restrictionModes.isEmpty()) {
 				Set<Route> routes = transitService().getRoutesForStop(mStop.stop);
 
-				List<VehicleModesOfTransportEnumeration> types = CommonOJP.getTraverseModes(routes);
+				List<VehicleModesOfTransportEnumeration> types = OJPCommon.getTraverseModes(routes);
 						
 				if(Collections.disjoint(restrictionModes, types)) { //at list one mode must be in common
 					return false;

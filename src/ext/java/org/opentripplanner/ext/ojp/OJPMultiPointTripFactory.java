@@ -178,7 +178,7 @@ public class OJPMultiPointTripFactory {
 				modeList = request.getParams().getPtModeFilter().getPtMode();
 				excludeModes = request.getParams().getPtModeFilter().isExclude();
 				for(VehicleModesOfTransportEnumeration mode : modeList) {
-					String otpMode = CommonOJP.convertOTPModes(mode);
+					String otpMode = OJPCommon.convertOTPModes(mode);
 					if(otpMode != null) {
 						if(!excludeModes) {
 							requestModes.add(otpMode);
@@ -733,7 +733,7 @@ public class OJPMultiPointTripFactory {
 									dj.getContent().add(factory.createDatedJourneyStructurePublishedLineName(getInternationName(leg.route, lang)));
 									dj.getContent().add(factory.createOperatingDayRef(new OperatingDayRefStructure().withValue(leg.serviceDate)));
 
-									dj.getContent().add(factory.createDatedJourneyStructureMode(new ModeStructure().withPtMode(CommonOJP.convertOJPModes(leg.routeType))));
+									dj.getContent().add(factory.createDatedJourneyStructureMode(new ModeStructure().withPtMode(OJPCommon.convertOJPModes(leg.routeType))));
 
 
 									timedLeg.setService(dj);
@@ -745,7 +745,7 @@ public class OJPMultiPointTripFactory {
 										LinkProjection projection = new LinkProjection();
 
 										EncodedPolyline polyline = leg.legGeometry;
-										List<Coordinate> coordinates = CommonOJP.decodePolyline(polyline);
+										List<Coordinate> coordinates = OJPCommon.decodePolyline(polyline);
 
 										for (Coordinate coor : coordinates) {
 											LocationStructure point = new LocationStructure();
@@ -852,8 +852,8 @@ private TransitService transitService() {
 }
 
 private Trip trip(String tripId) {
-	var trip = transitService().getTripForId(CommonOJP.createId("tripId", tripId));
-	return CommonOJP.validateExist("Trip", trip, "tripId", tripId);
+	var trip = transitService().getTripForId(OJPCommon.createId("tripId", tripId));
+	return OJPCommon.validateExist("Trip", trip, "tripId", tripId);
 }
 
 	private RouteRequest createRequest(Map<String, Object> requestMap) {

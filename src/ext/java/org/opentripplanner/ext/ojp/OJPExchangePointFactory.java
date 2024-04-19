@@ -91,7 +91,7 @@ public class OJPExchangePointFactory {
 				modeList = exchangePointsRequest.getParams().getPtModes().getPtMode();
 				boolean excludeModes = exchangePointsRequest.getParams().getPtModes().isExclude();
 				for(VehicleModesOfTransportEnumeration mode : modeList) {
-					String otpMode = CommonOJP.convertOTPModes(mode);
+					String otpMode = OJPCommon.convertOTPModes(mode);
 					if(otpMode != null) {
 						if(excludeModes == false) {
 							requestModes.add(otpMode);
@@ -136,7 +136,7 @@ public class OJPExchangePointFactory {
 					.flatMap(c -> transitService().getRoutesForStop(c).stream())
 					.distinct().toList();
 
-				List<VehicleModesOfTransportEnumeration> types = CommonOJP.getTraverseModes(new HashSet<>(routes));
+				List<VehicleModesOfTransportEnumeration> types = OJPCommon.getTraverseModes(new HashSet<>(routes));
 						
 				if(Collections.disjoint(requestModes, types)) { //at list one mode must be in common
 					return false;
@@ -236,8 +236,8 @@ public class OJPExchangePointFactory {
 	}
 
 	private Station station(String stationId) {
-		var station = transitService().getStationById(CommonOJP.createId("stationId", stationId));
-		return CommonOJP.validateExist("Station", station, "stationId", stationId);
+		var station = transitService().getStationById(OJPCommon.createId("stationId", stationId));
+		return OJPCommon.validateExist("Station", station, "stationId", stationId);
 	}
 
 	

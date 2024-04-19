@@ -13,7 +13,7 @@ import org.opentripplanner.transit.model.framework.FeedScopedId;
 import org.opentripplanner.transit.model.network.Route;
 import java.util.stream.Collectors;
 
-public class CommonOJP {
+public class OJPCommon {
 
   public List<String> allOTPModes = Arrays.asList("TRAM","SUBWAY","RAIL","BUS","FERRY","GONDOLA","FUNICULAR");
   public static String convertOTPModes(VehicleModesOfTransportEnumeration ojpMode) {

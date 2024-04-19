@@ -16,8 +16,6 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import org.opentripplanner.standalone.api.OtpServerRequestContext;
 
-import org.opentripplanner.transit.service.TransitService;
-
 import de.vdv.ojp.model.AbstractFunctionalServiceRequestStructure;
 import de.vdv.ojp.model.OJP;
 import de.vdv.ojp.model.OJPResponseStructure;
@@ -52,9 +50,6 @@ public class OJPResource {
 		private final OtpServerRequestContext serverContext;
     private final ObjectFactory factory = new ObjectFactory();
 
-		private TransitService transitService() {
-			return serverContext.transitService();
-		}
     public OJPResource (@Context OtpServerRequestContext otpServer, @PathParam("ignoreRouterId") String ignoreRouterId) {
 			this.serverContext = otpServer;
     }
@@ -67,7 +62,7 @@ public class OJPResource {
     @POST
     @Consumes("application/xml")
     public Response ojpExec (String requestRaw) {
-			OJP request = null;
+			OJP request;
 			try {
 				StringReader sr = new StringReader(requestRaw);
 				JAXBContext jaxbContext = JAXBContext.newInstance(OJP.class);
@@ -77,7 +72,7 @@ public class OJPResource {
 				return Response
 					.status(Response.Status.BAD_REQUEST)
 					.type(MediaType.TEXT_PLAIN_TYPE)
-					.entity("Error Parsing XML")
+					.entity("Error Parsing XML: "+e.getLocalizedMessage())
 					.build();
 			}
 
@@ -151,8 +146,6 @@ public class OJPResource {
     	v.setServiceDelivery(s);
     	
     	ojp.setOJPResponse(v);
-    	System.out.println("END!");
-			System.out.println(ojp.toString());
 
 			try {
 				StringWriter writer = new StringWriter();
@@ -168,11 +161,10 @@ public class OJPResource {
 					.entity(resultXml)
 					.build();
 			}catch (Exception e){
-				e.printStackTrace();
 				return Response
 					.status(Response.Status.BAD_REQUEST)
 					.type(MediaType.TEXT_PLAIN_TYPE)
-					.entity("Error Marshalling XML")
+					.entity("Error Marshalling XML: "+e.getLocalizedMessage())
 					.build();
 			}
 

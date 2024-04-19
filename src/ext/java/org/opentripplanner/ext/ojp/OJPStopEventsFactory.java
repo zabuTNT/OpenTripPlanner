@@ -228,11 +228,11 @@ public class OJPStopEventsFactory {
 	        	
 	        	if(!filteredMode.isEmpty()) {
 	        		if(excludeModeType) {
-	        			if(filteredMode.contains(CommonOJP.getTraverseMode(route))) {
+	        			if(filteredMode.contains(OJPCommon.getTraverseMode(route))) {
 	        				return false;
 	        			}
 	        		}else {
-	        			if(!filteredMode.contains(CommonOJP.getTraverseMode(route))) {
+	        			if(!filteredMode.contains(OJPCommon.getTraverseMode(route))) {
 	        				return false;
 	        			}
 	        		}
@@ -325,7 +325,7 @@ public class OJPStopEventsFactory {
 				js.getContent().add(factory.createDatedJourneyStructureLineRef(line));
 				
 				ModeStructure mode = new ModeStructure();
-				mode.setPtMode(CommonOJP.getTraverseMode(route));
+				mode.setPtMode(OJPCommon.getTraverseMode(route));
 				
 				js.getContent().add(factory.createDatedJourneyStructureMode(mode));
 				
@@ -588,8 +588,8 @@ public class OJPStopEventsFactory {
 
 
 	private StopLocation stop(String stopId) {
-		var stop = transitService().getRegularStop(CommonOJP.createId("stopId", stopId));
-		return CommonOJP.validateExist("Stop", stop, "stopId", stop);
+		var stop = transitService().getRegularStop(OJPCommon.createId("stopId", stopId));
+		return OJPCommon.validateExist("Stop", stop, "stopId", stop);
 	}
 	
 }
