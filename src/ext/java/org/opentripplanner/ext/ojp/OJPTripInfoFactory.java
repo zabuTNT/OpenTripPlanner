@@ -61,353 +61,295 @@ import de.vdv.ojp.TripInfoResponseContextStructure;
 import de.vdv.ojp.TripInfoResultStructure;
 
 public class OJPTripInfoFactory {
-	
-	private final OJPTripInfoRequestStructure request;
-	private final OtpServerRequestContext serverRequestContext;
-	private List<VehicleModesOfTransportEnumeration> filteredMode = new ArrayList<>();
-	private List<String> filteredLines = new ArrayList<>();
-	private List<String> filteredOperators = new ArrayList<>();
-	
-	private boolean includeCalls = false;
-	private boolean includeService = false;		
-	private boolean includeDays = false;
-	private boolean excludeModeType = false;
-	private boolean excludeLines = false;
-	private boolean excludeOperators = false;
-	long maxResults = Integer.MAX_VALUE;
-	StopEventTypeEnumeration stopEventType = StopEventTypeEnumeration.BOTH;
-	private ObjectFactory factory;
-	
-	public OJPTripInfoFactory(OtpServerRequestContext serverRequestContext, OJPTripInfoRequestStructure request, ObjectFactory factory) {
-		this.serverRequestContext = serverRequestContext;
-		this.request = request;
-		this.factory = factory;
-	}
-	
-    private static VehicleModesOfTransportEnumeration getTraverseMode(Route route) {
-        int routeType = route.getGtfsType();
-        if (routeType >= 100 && routeType < 200) { // Railway Service
-            return VehicleModesOfTransportEnumeration.RAIL;
-        } else if (routeType >= 200 && routeType < 300) { //Coach Service
-            return VehicleModesOfTransportEnumeration.BUS;
-        } else if (routeType >= 300
-                && routeType < 500) { //Suburban Railway Service and Urban Railway service
-            if (routeType >= 401 && routeType <= 402) {
-                return VehicleModesOfTransportEnumeration.METRO;
-            }
-            return VehicleModesOfTransportEnumeration.RAIL;
-        } else if (routeType >= 500 && routeType < 700) { //Metro Service and Underground Service
-            return VehicleModesOfTransportEnumeration.METRO;
-        } else if (routeType >= 700 && routeType < 900) { //Bus Service and Trolleybus service
-            return VehicleModesOfTransportEnumeration.BUS;
-        } else if (routeType >= 900 && routeType < 1000) { //Tram service
-            return VehicleModesOfTransportEnumeration.TRAM;
-        } else if (routeType >= 1000 && routeType < 1100) { //Water Transport Service
-            return VehicleModesOfTransportEnumeration.WATER_TRANSPORT;
-        } else if (routeType >= 1100 && routeType < 1200) { //Air Service
-            return VehicleModesOfTransportEnumeration.AIR;
-        } else if (routeType >= 1200 && routeType < 1300) { //Ferry Service
-            return VehicleModesOfTransportEnumeration.FERRY_SERVICE;
-        } else if (routeType >= 1300 && routeType < 1400) { //Telecabin Service
-            return VehicleModesOfTransportEnumeration.TELECABIN;
-        } else if (routeType >= 1400 && routeType < 1500) { //Funicalar Service
-            return VehicleModesOfTransportEnumeration.FUNICULAR;
-        } 
-        /* Original GTFS route types. Should these be checked before TPEG types? */
-        switch (routeType) {
-        case 0:
-            return VehicleModesOfTransportEnumeration.TRAM;
-        case 1:
-            return VehicleModesOfTransportEnumeration.METRO;
-        case 2:
-            return VehicleModesOfTransportEnumeration.RAIL;
-        case 3:
-            return VehicleModesOfTransportEnumeration.BUS;
-        case 4:
-            return VehicleModesOfTransportEnumeration.FERRY_SERVICE;
-        case 5:
-            return VehicleModesOfTransportEnumeration.TRAM;
-        case 6:
-            return VehicleModesOfTransportEnumeration.TELECABIN;
-        case 7:
-            return VehicleModesOfTransportEnumeration.FUNICULAR;
-        default:
-        	return VehicleModesOfTransportEnumeration.UNKNOWN;
-        }
-    }
-    
-    private static List<VehicleModesOfTransportEnumeration> getTraverseModes(Set<Route> routes) {
-    	return routes.stream().map(r -> getTraverseMode(r)).distinct().collect(Collectors.toList());
+
+  private final OJPTripInfoRequestStructure request;
+  private final OtpServerRequestContext serverRequestContext;
+  private List<VehicleModesOfTransportEnumeration> filteredMode = new ArrayList<>();
+  private List<String> filteredLines = new ArrayList<>();
+  private List<String> filteredOperators = new ArrayList<>();
+
+  private boolean includeCalls = false;
+  private boolean includeService = false;
+  private boolean includeDays = false;
+  private boolean excludeModeType = false;
+  private boolean excludeLines = false;
+  private boolean excludeOperators = false;
+  long maxResults = Integer.MAX_VALUE;
+  StopEventTypeEnumeration stopEventType = StopEventTypeEnumeration.BOTH;
+  private ObjectFactory factory;
+
+  public OJPTripInfoFactory(OtpServerRequestContext serverRequestContext, OJPTripInfoRequestStructure request, ObjectFactory factory) {
+    this.serverRequestContext = serverRequestContext;
+    this.request = request;
+    this.factory = factory;
+  }
+
+  public OJPTripInfoDeliveryStructure create() {
+    OJPTripInfoDeliveryStructure event = new OJPTripInfoDeliveryStructure();
+
+    long timeStart = System.currentTimeMillis();
+
+    String tripId = null;
+    filteredMode = new ArrayList<>();
+
+
+    Duration duration = Duration.ofHours(24);
+    Date dateTmp = new Date();
+    ZonedDateTime date = ZonedDateTime.now();
+
+    if (request.getJourneyRef() != null) {
+      tripId = request.getJourneyRef().getValue();
     }
 
-	public OJPTripInfoDeliveryStructure create() {
-		OJPTripInfoDeliveryStructure event = new OJPTripInfoDeliveryStructure();
-		
-		long timeStart = System.currentTimeMillis();
-		
-		String tripId = null;
-		filteredMode = new ArrayList<>();
-		
-		
-		Duration duration = Duration.ofHours(24);
-		Date dateTmp = new Date();
-		ZonedDateTime date = ZonedDateTime.now();
-		
-		if(request.getJourneyRef() != null) {
-			tripId = request.getJourneyRef().getValue();
-		}
-		
-		String pattern = "yyyy-MM-dd";
-		SimpleDateFormat simpleDateFormat = new SimpleDateFormat(pattern);
-		
-		if(request.getOperatingDayRef() != null) {
-			String dateString = request.getOperatingDayRef().getValue();
-			try {
-				dateTmp = simpleDateFormat.parse(dateString);
-			} catch (ParseException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			date = dateTmp.toInstant()
-				      .atZone(ZoneId.systemDefault());
-		}
-		
-		if(request.getParams() != null) {
-									
-			if(request.getParams().isIncludeCalls() != null ) {
-				includeCalls = request.getParams().isIncludeCalls().booleanValue();
-			}
-			
-			if(request.getParams().isIncludeService() != null) {
-				includeService = request.getParams().isIncludeService().booleanValue();
-			}
-			
-		}
-		
+    String pattern = "yyyy-MM-dd";
+    SimpleDateFormat simpleDateFormat = new SimpleDateFormat(pattern);
 
-		
-		if(tripId == null) {
-			event.setStatus(false);
-			ServiceDeliveryErrorConditionStructure error = new ServiceDeliveryErrorConditionStructure();
-			ErrorDescriptionStructure descr = new ErrorDescriptionStructure();
-			descr.setValue("No Trip defined");
-			event.setErrorCondition(error.withDescription(descr ));
-			long timeEnd = System.currentTimeMillis();
-			event.setCalcTime(BigInteger.valueOf(timeEnd - timeStart));
-			return event;		
-		}
-			//search by id
-		Trip trip;
+    if (request.getOperatingDayRef() != null) {
+      String dateString = request.getOperatingDayRef().getValue();
+      try {
+        dateTmp = simpleDateFormat.parse(dateString);
+      } catch (ParseException e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
+      }
+      date = dateTmp.toInstant()
+        .atZone(ZoneId.systemDefault());
+    }
 
-		try {
-			trip = trip(tripId);
-		} catch (NotFoundException e ){
-			event.setStatus(false);
-			ServiceDeliveryErrorConditionStructure error = new ServiceDeliveryErrorConditionStructure();
-			ErrorDescriptionStructure descr = new ErrorDescriptionStructure();
-			descr.setValue("No Trip");
-			event.setErrorCondition(error.withDescription(descr ));
-			long timeEnd = System.currentTimeMillis();
-			event.setCalcTime(BigInteger.valueOf(timeEnd - timeStart));
-			return event;
-		}
+    if (request.getParams() != null) {
 
-		Collection<Agency> agencies = transitService()
-			.getAgencies()
-			.stream()
-			.filter(agency -> agency.getId().getFeedId().equals(trip.getId().getFeedId()))
-			.toList();
+      if (request.getParams().isIncludeCalls() != null) {
+        includeCalls = request.getParams().isIncludeCalls().booleanValue();
+      }
 
-		ZoneId zoneId = agencies.iterator().next().getTimezone();
-		ZoneOffset zoneOffSet = zoneId.getRules().getOffset(date.toInstant());
+      if (request.getParams().isIncludeService() != null) {
+        includeService = request.getParams().isIncludeService().booleanValue();
+      }
 
-		String lang = agencies.iterator().next().getLang();
+    }
+
+
+    if (tripId == null) {
+      event.setStatus(false);
+      ServiceDeliveryErrorConditionStructure error = new ServiceDeliveryErrorConditionStructure();
+      ErrorDescriptionStructure descr = new ErrorDescriptionStructure();
+      descr.setValue("No Trip defined");
+      event.setErrorCondition(error.withDescription(descr));
+      long timeEnd = System.currentTimeMillis();
+      event.setCalcTime(BigInteger.valueOf(timeEnd - timeStart));
+      return event;
+    }
+    //search by id
+    Trip trip;
+
+    try {
+      trip = trip(tripId);
+    } catch (NotFoundException e) {
+      event.setStatus(false);
+      ServiceDeliveryErrorConditionStructure error = new ServiceDeliveryErrorConditionStructure();
+      ErrorDescriptionStructure descr = new ErrorDescriptionStructure();
+      descr.setValue("No Trip");
+      event.setErrorCondition(error.withDescription(descr));
+      long timeEnd = System.currentTimeMillis();
+      event.setCalcTime(BigInteger.valueOf(timeEnd - timeStart));
+      return event;
+    }
+
+    Collection<Agency> agencies = transitService()
+      .getAgencies()
+      .stream()
+      .filter(agency -> agency.getId().getFeedId().equals(trip.getId().getFeedId()))
+      .toList();
+
+    ZoneId zoneId = agencies.iterator().next().getTimezone();
+    ZoneOffset zoneOffSet = zoneId.getRules().getOffset(date.toInstant());
+
+    String lang = agencies.iterator().next().getLang();
     assert lang != null;
     Locale locale = new Locale(lang);
 
 
-		TripPattern tp = transitService().getPatternForTrip(trip, date.toLocalDate());
+    TripPattern tp = transitService().getPatternForTrip(trip, date.toLocalDate());
 
-		Timetable table = transitService()
-			.getTimetableForTripPattern(tp, date.toLocalDate());
-		List<TripTimeOnDate> stoptimes = TripTimeOnDate.fromTripTimes(table, trip);
+    Timetable table = transitService()
+      .getTimetableForTripPattern(tp, date.toLocalDate());
+    List<TripTimeOnDate> stoptimes = TripTimeOnDate.fromTripTimes(table, trip);
 
-		TripInfoResponseContextStructure context = new TripInfoResponseContextStructure();
-		Places places = new Places();
-		TripInfoResultStructure result = new TripInfoResultStructure();
-		
-		LocalDateTime now = LocalDateTime.now();
-		
-		stoptimes.stream()
-	        .sorted(Comparator.comparing(TripTimeOnDate::getStopIndex))
-	        .forEach(st -> {
-						StopLocation stop = st.getStop();
-	    		
-						PlaceStructure p = new PlaceStructure();
-						StopPointStructure sp = new StopPointStructure();
-						InternationalTextStructure it = new InternationalTextStructure();
-						NaturalLanguageStringStructure nL = new NaturalLanguageStringStructure();
-						nL.setLang(lang);
-						nL.setValue(stop.getName().toString(locale));
-						it.setText(nL);
-						sp.setStopPointName(it);
-						sp.setWheelchairAccessible(stop.getWheelchairAccessibility() == Accessibility.POSSIBLE);
-						LocationStructure geo = new LocationStructure();
-						geo.setLatitude(BigDecimal.valueOf(stop.getLat()));
-						geo.setLongitude(BigDecimal.valueOf(stop.getLon()));
-						p.setGeoPosition(geo);
-						StopPointRefStructure sRef = new StopPointRefStructure();
-						sRef.setValue(stop.getId().toString());
-						sp.setStopPointRef(sRef );
-						p.setStopPoint(sp);
-						p.setLocationName(it);
+    TripInfoResponseContextStructure context = new TripInfoResponseContextStructure();
+    Places places = new Places();
+    TripInfoResultStructure result = new TripInfoResultStructure();
 
-						boolean found = false;
-						for(PlaceStructure place : places.getLocation()) {
-							if(place.getStopPoint().getStopPointRef().equals(sRef)) {
-								found = true;
-								break;
-							}
-						}
+    LocalDateTime now = LocalDateTime.now();
 
-						if(!found) {
-							places.getLocation().add(p);
-						}
+    stoptimes.stream()
+      .sorted(Comparator.comparing(TripTimeOnDate::getStopIndex))
+      .forEach(st -> {
+        StopLocation stop = st.getStop();
 
-						if(includeCalls) {
-							CallAtStopStructure mCallAtStop = new CallAtStopStructure();
+        PlaceStructure p = new PlaceStructure();
+        StopPointStructure sp = new StopPointStructure();
+        InternationalTextStructure it = new InternationalTextStructure();
+        NaturalLanguageStringStructure nL = new NaturalLanguageStringStructure();
+        nL.setLang(lang);
+        nL.setValue(stop.getName().toString(locale));
+        it.setText(nL);
+        sp.setStopPointName(it);
+        sp.setWheelchairAccessible(stop.getWheelchairAccessibility() == Accessibility.POSSIBLE);
+        LocationStructure geo = new LocationStructure();
+        geo.setLatitude(BigDecimal.valueOf(stop.getLat()));
+        geo.setLongitude(BigDecimal.valueOf(stop.getLon()));
+        p.setGeoPosition(geo);
+        StopPointRefStructure sRef = new StopPointRefStructure();
+        sRef.setValue(stop.getId().toString());
+        sp.setStopPointRef(sRef);
+        p.setStopPoint(sp);
+        p.setLocationName(it);
 
-							mCallAtStop.setOrder(BigInteger.valueOf(st.getGtfsSequence()));
-							mCallAtStop.setStopPointRef(new StopPointRefStructure().withValue(stop.getId().toString()));
+        boolean found = false;
+        for (PlaceStructure place : places.getLocation()) {
+          if (place.getStopPoint().getStopPointRef().equals(sRef)) {
+            found = true;
+            break;
+          }
+        }
 
+        if (!found) {
+          places.getLocation().add(p);
+        }
 
-							mCallAtStop.setStopPointName(it);
+        if (includeCalls) {
+          CallAtStopStructure mCallAtStop = new CallAtStopStructure();
 
-							ServiceArrival arrival = new ServiceArrival();
+          mCallAtStop.setOrder(BigInteger.valueOf(st.getGtfsSequence()));
+          mCallAtStop.setStopPointRef(new StopPointRefStructure().withValue(stop.getId().toString()));
 
 
-							arrival.setEstimatedTime(ZonedDateTime.of(LocalDateTime.ofEpochSecond(st.getServiceDayMidnight() + st.getRealtimeArrival(), 0, zoneOffSet),zoneId));
-							arrival.setTimetabledTime(ZonedDateTime.of(LocalDateTime.ofEpochSecond(st.getServiceDayMidnight() + st.getScheduledArrival(), 0, zoneOffSet),zoneId));
+          mCallAtStop.setStopPointName(it);
+
+          ServiceArrival arrival = new ServiceArrival();
 
 
-							mCallAtStop.setServiceArrival(arrival);
+          arrival.setEstimatedTime(ZonedDateTime.of(LocalDateTime.ofEpochSecond(st.getServiceDayMidnight() + st.getRealtimeArrival(), 0, zoneOffSet), zoneId));
+          arrival.setTimetabledTime(ZonedDateTime.of(LocalDateTime.ofEpochSecond(st.getServiceDayMidnight() + st.getScheduledArrival(), 0, zoneOffSet), zoneId));
 
 
-							ServiceDeparture departure = new ServiceDeparture();
-							departure.setEstimatedTime(ZonedDateTime.of(LocalDateTime.ofEpochSecond(st.getServiceDayMidnight() + st.getRealtimeDeparture(), 0, zoneOffSet),zoneId));
-						  departure.setTimetabledTime(ZonedDateTime.of(LocalDateTime.ofEpochSecond(st.getServiceDayMidnight() + st.getScheduledDeparture(), 0, zoneOffSet),zoneId));
+          mCallAtStop.setServiceArrival(arrival);
 
 
-							mCallAtStop.setServiceDeparture(departure);
+          ServiceDeparture departure = new ServiceDeparture();
+          departure.setEstimatedTime(ZonedDateTime.of(LocalDateTime.ofEpochSecond(st.getServiceDayMidnight() + st.getRealtimeDeparture(), 0, zoneOffSet), zoneId));
+          departure.setTimetabledTime(ZonedDateTime.of(LocalDateTime.ofEpochSecond(st.getServiceDayMidnight() + st.getScheduledDeparture(), 0, zoneOffSet), zoneId));
 
-							if(now.isBefore(LocalDateTime.ofEpochSecond(st.getServiceDayMidnight() + st.getRealtimeArrival(), 0, zoneOffSet))) {
-								result.getOnwardCall().add(mCallAtStop );
-							}else {
-								result.getPreviousCall().add(mCallAtStop );
-							}
-					
-	    			}
-	    		
-	    		
-					});
-		
-			context.setPlaces(places );
-			event.setTripInfoResponseContext(context );	
-			event.setTripInfoResult(result);
-		
-			if(includeService) {
-				DatedJourneyStructure js = new DatedJourneyStructure();
-				
-				OperatingDayRefStructure op = new OperatingDayRefStructure();
-		
-				op.setValue(simpleDateFormat.format(dateTmp));
-				//op.setValue(graphIndex.tripForId.get(tts.tripId).getServiceId().toString());
-				
-				js.getContent().add(factory.createOperatingDayRef(op));
-				
-				JourneyRefStructure jr = new JourneyRefStructure();
-				jr.setValue(tripId);
-				
-				js.getContent().add(factory.createJourneyRef(jr));
-				
-				LineRefStructure line = new LineRefStructure();
-				Route route = trip.getRoute();
-				line.setValue(
-						route.getId().toString());
-				
-				js.getContent().add(factory.createDatedJourneyStructureLineRef(line));
-				
-				ModeStructure mode = new ModeStructure();
-				mode.setPtMode(getTraverseMode(route));
-				
-				js.getContent().add(factory.createDatedJourneyStructureMode(mode));
-				
-				OperatorRefStructure operator = new OperatorRefStructure();
-				
-				operator.setValue(route.getAgency().getId().toString());
-				
-				js.getContent().add(factory.createOperatorRef(operator));
-				
-				StopPointRefStructure origin = new StopPointRefStructure();
-				StopPointRefStructure destination = new StopPointRefStructure();
-				origin.setValue(tp.firstStop().getId().toString());
-				destination.setValue(tp.lastStop().getId().toString());
-				
 
-				js.getContent().add(factory.createDatedJourneyStructureOriginStopPointRef(origin));
-				js.getContent().add(factory.createDatedJourneyStructureDestinationStopPointRef(destination));
+          mCallAtStop.setServiceDeparture(departure);
 
-				InternationalTextStructure lineName = new InternationalTextStructure();
-				NaturalLanguageStringStructure valueLineLang = new NaturalLanguageStringStructure();
-				
-				valueLineLang.setLang(lang);
-				valueLineLang.setValue(route.getLongName() != null ? route.getLongName().toString(locale) : route.getShortName());
-				lineName.setText(valueLineLang);
-				
-				js.getContent().add(factory.createDatedJourneyStructurePublishedLineName(lineName));
-				
-				InternationalTextStructure originName = new InternationalTextStructure();
-				NaturalLanguageStringStructure valueOriginLang = new NaturalLanguageStringStructure();
-				
-				valueOriginLang.setLang(lang);
-				valueOriginLang.setValue(tp.firstStop().getName().toString(locale));
-				originName.setText(valueOriginLang);
-				
-				
-				js.getContent().add(factory.createDatedJourneyStructureOriginText(originName));
-				
-				InternationalTextStructure destinationName = new InternationalTextStructure();
-				NaturalLanguageStringStructure valueDestinationLang = new NaturalLanguageStringStructure();
-				
-				valueDestinationLang.setLang(lang);
-				valueDestinationLang.setValue(tp.lastStop().getName().toString(locale));
-				destinationName.setText(valueDestinationLang);
-				
-				js.getContent().add(factory.createDatedJourneyStructureDestinationText(destinationName));	
-				
-				
-				result.setService(js);
-			}
-		
-				
-		
-		long timeEnd = System.currentTimeMillis();
-		event.setCalcTime(BigInteger.valueOf(timeEnd - timeStart));
-		return event;
-	}
+          if (now.isBefore(LocalDateTime.ofEpochSecond(st.getServiceDayMidnight() + st.getRealtimeArrival(), 0, zoneOffSet))) {
+            result.getOnwardCall().add(mCallAtStop);
+          } else {
+            result.getPreviousCall().add(mCallAtStop);
+          }
 
-	private TransitService transitService() {
-		return this.serverRequestContext.transitService();
-	}
+        }
 
-	private static FeedScopedId createId(String name, String value) {
-		return FeedScopedIdMapper.mapToDomain(name, value);
-	}
 
-	private Trip trip(String tripId) {
-		var trip = transitService().getTripForId(createId("tripId", tripId));
-		return OJPCommon.validateExist("Trip", trip, "tripId", tripId);
-	}
+      });
 
-	
+    context.setPlaces(places);
+    event.setTripInfoResponseContext(context);
+    event.setTripInfoResult(result);
+
+    if (includeService) {
+      DatedJourneyStructure js = new DatedJourneyStructure();
+
+      OperatingDayRefStructure op = new OperatingDayRefStructure();
+
+      op.setValue(simpleDateFormat.format(dateTmp));
+      //op.setValue(graphIndex.tripForId.get(tts.tripId).getServiceId().toString());
+
+      js.getContent().add(factory.createOperatingDayRef(op));
+
+      JourneyRefStructure jr = new JourneyRefStructure();
+      jr.setValue(tripId);
+
+      js.getContent().add(factory.createJourneyRef(jr));
+
+      LineRefStructure line = new LineRefStructure();
+      Route route = trip.getRoute();
+      line.setValue(
+        route.getId().toString());
+
+      js.getContent().add(factory.createDatedJourneyStructureLineRef(line));
+
+      ModeStructure mode = new ModeStructure();
+      mode.setPtMode(OJPCommon.getTraverseMode(route));
+
+      js.getContent().add(factory.createDatedJourneyStructureMode(mode));
+
+      OperatorRefStructure operator = new OperatorRefStructure();
+
+      operator.setValue(route.getAgency().getId().toString());
+
+      js.getContent().add(factory.createOperatorRef(operator));
+
+      StopPointRefStructure origin = new StopPointRefStructure();
+      StopPointRefStructure destination = new StopPointRefStructure();
+      origin.setValue(tp.firstStop().getId().toString());
+      destination.setValue(tp.lastStop().getId().toString());
+
+
+      js.getContent().add(factory.createDatedJourneyStructureOriginStopPointRef(origin));
+      js.getContent().add(factory.createDatedJourneyStructureDestinationStopPointRef(destination));
+
+      InternationalTextStructure lineName = new InternationalTextStructure();
+      NaturalLanguageStringStructure valueLineLang = new NaturalLanguageStringStructure();
+
+      valueLineLang.setLang(lang);
+      valueLineLang.setValue(route.getLongName() != null ? route.getLongName().toString(locale) : route.getShortName());
+      lineName.setText(valueLineLang);
+
+      js.getContent().add(factory.createDatedJourneyStructurePublishedLineName(lineName));
+
+      InternationalTextStructure originName = new InternationalTextStructure();
+      NaturalLanguageStringStructure valueOriginLang = new NaturalLanguageStringStructure();
+
+      valueOriginLang.setLang(lang);
+      valueOriginLang.setValue(tp.firstStop().getName().toString(locale));
+      originName.setText(valueOriginLang);
+
+
+      js.getContent().add(factory.createDatedJourneyStructureOriginText(originName));
+
+      InternationalTextStructure destinationName = new InternationalTextStructure();
+      NaturalLanguageStringStructure valueDestinationLang = new NaturalLanguageStringStructure();
+
+      valueDestinationLang.setLang(lang);
+      valueDestinationLang.setValue(tp.lastStop().getName().toString(locale));
+      destinationName.setText(valueDestinationLang);
+
+      js.getContent().add(factory.createDatedJourneyStructureDestinationText(destinationName));
+
+
+      result.setService(js);
+    }
+
+
+    long timeEnd = System.currentTimeMillis();
+    event.setCalcTime(BigInteger.valueOf(timeEnd - timeStart));
+    return event;
+  }
+
+  private TransitService transitService() {
+    return this.serverRequestContext.transitService();
+  }
+
+  private static FeedScopedId createId(String name, String value) {
+    return FeedScopedIdMapper.mapToDomain(name, value);
+  }
+
+  private Trip trip(String tripId) {
+    var trip = transitService().getTripForId(createId("tripId", tripId));
+    return OJPCommon.validateExist("Trip", trip, "tripId", tripId);
+  }
+
+
 }

@@ -40,205 +40,226 @@ import de.vdv.ojp.StopPlaceRefStructure;
 import de.vdv.ojp.StopPlaceStructure;
 
 public class OJPExchangePointFactory {
-	
-	private final OJPExchangePointsRequestStructure exchangePointsRequest;
-	private final OtpServerRequestContext serverRequestContext;
-	private List<VehicleModesOfTransportEnumeration> modeList = new ArrayList<>();
-	private List<String> requestModes = new ArrayList<>();
-	private ObjectFactory factory;
-	
-	List<String> allOTPModes = Arrays.asList("TRAM","SUBWAY","RAIL","BUS","FERRY","GONDOLA","FUNICULAR");
-	
-	public OJPExchangePointFactory(OtpServerRequestContext serverRequestContext, OJPExchangePointsRequestStructure exchangePointsRequest, ObjectFactory factory) {
-		this.serverRequestContext = serverRequestContext;
-		this.exchangePointsRequest = exchangePointsRequest;
-		this.factory = factory;
-	}
 
-	public OJPExchangePointsDeliveryStructure create() {
-		OJPExchangePointsDeliveryStructure location = new OJPExchangePointsDeliveryStructure();
-		
-		long timeStart = System.currentTimeMillis();
-		
-		String stopCode = null;
-		
-		int continueAt = 0;
-		boolean includePtModes = false;
-		long maxResults = Integer.MAX_VALUE;
-		
-		if(exchangePointsRequest.getPlaceRef() != null) {
-			if(exchangePointsRequest.getPlaceRef().getStopPointRef() != null) {
-				stopCode = exchangePointsRequest.getPlaceRef().getStopPointRef().getValue();
-			} else if(exchangePointsRequest.getPlaceRef().getStopPlaceRef() != null) {
-				stopCode = exchangePointsRequest.getPlaceRef().getStopPlaceRef().getValue();
-			}	
-		}
-		
-		
+  private final OJPExchangePointsRequestStructure exchangePointsRequest;
+  private final OtpServerRequestContext serverRequestContext;
+  private List<VehicleModesOfTransportEnumeration> modeList = new ArrayList<>();
+  private List<String> requestModes = new ArrayList<>();
+  private ObjectFactory factory;
 
-		if(exchangePointsRequest.getParams() != null) {
-						
-			
-			if(exchangePointsRequest.getParams().getContinueAt()!=null) {
-				continueAt = exchangePointsRequest.getParams().getContinueAt().intValue();
-			}
-			
-			if(exchangePointsRequest.getParams().getNumberOfResults() != null) {
-				maxResults = exchangePointsRequest.getParams().getNumberOfResults().longValue();
-			}
-			
-			if(exchangePointsRequest.getParams().getPtModes() != null) {
-				modeList = exchangePointsRequest.getParams().getPtModes().getPtMode();
-				boolean excludeModes = exchangePointsRequest.getParams().getPtModes().isExclude();
-				for(VehicleModesOfTransportEnumeration mode : modeList) {
-					String otpMode = OJPCommon.convertOTPModes(mode);
-					if(otpMode != null) {
-						if(excludeModes == false) {
-							requestModes.add(otpMode);
-						}else {
-							allOTPModes.remove(otpMode);
-						}
-					}
-					
-				}
-				if(excludeModes == true) {
-					requestModes.addAll(allOTPModes);
-				}
-			}else {
-				requestModes.addAll(allOTPModes);
-			}
-			
-			
-			
-		}
-		
-		List<Station> stations = new ArrayList<>();
-		
-		if(stopCode != null) {
-			//search by id
-			try {
-				stations.add(station(stopCode));
-			}catch (NotFoundException e){
-				//TODO ?
-				e.printStackTrace();
-			}
-		}else {
-			stations = transitService().getStations().stream().toList();
-		}
+  List<String> allOTPModes = Arrays.asList("TRAM", "SUBWAY", "RAIL", "BUS", "FERRY", "GONDOLA", "FUNICULAR");
+
+  public OJPExchangePointFactory(OtpServerRequestContext serverRequestContext, OJPExchangePointsRequestStructure exchangePointsRequest, ObjectFactory factory) {
+    this.serverRequestContext = serverRequestContext;
+    this.exchangePointsRequest = exchangePointsRequest;
+    this.factory = factory;
+  }
+
+  public OJPExchangePointsDeliveryStructure create() {
+    OJPExchangePointsDeliveryStructure location = new OJPExchangePointsDeliveryStructure();
+
+    long timeStart = System.currentTimeMillis();
+
+    String stopCode = null;
+
+    int continueAt = 0;
+    boolean includePtModes = false;
+    long maxResults = Integer.MAX_VALUE;
+
+    if (exchangePointsRequest.getPlaceRef() != null) {
+      if (exchangePointsRequest.getPlaceRef().getStopPointRef() != null) {
+        stopCode = exchangePointsRequest.getPlaceRef().getStopPointRef().getValue();
+      } else if (exchangePointsRequest.getPlaceRef().getStopPlaceRef() != null) {
+        stopCode = exchangePointsRequest.getPlaceRef().getStopPlaceRef().getValue();
+      }
+    }
 
 
-				
-		List<Station> stops = stations.stream().filter(station -> {
-			//filter by modes
-			if(!requestModes.isEmpty()) {
+    if (exchangePointsRequest.getParams() != null) {
 
-				List<Route> routes = station.getChildStops().stream()
-					.flatMap(c -> transitService().getRoutesForStop(c).stream())
-					.distinct().toList();
 
-				List<VehicleModesOfTransportEnumeration> types = OJPCommon.getTraverseModes(new HashSet<>(routes));
-						
-				if(Collections.disjoint(requestModes, types)) { //at list one mode must be in common
-					return false;
-				}
-			}
-						
-			return true;
-		}).skip(continueAt).limit(maxResults).toList();
-		
-		BigInteger mContinueAt = BigInteger.valueOf(continueAt + stops.size());
-		
-		if(stops.isEmpty()) {
-			location.setStatus(false);
-			ServiceDeliveryErrorConditionStructure error = new ServiceDeliveryErrorConditionStructure();
-			ErrorDescriptionStructure descr = new ErrorDescriptionStructure();
-			descr.setValue("No Exchange Point");
-			location.setErrorCondition(error.withDescription(descr ));
-			long timeEnd = System.currentTimeMillis();
-			location.setCalcTime(BigInteger.valueOf(timeEnd - timeStart));
-			return location;			
-		}else {
-			location.setStatus(true);
-			if(stops.size() == maxResults) {
-				location.setContinueAt(mContinueAt);
-			}
-		}
-		
-		
-		
-		
-		for(Station stop : stops) {
+      if (exchangePointsRequest.getParams().getContinueAt() != null) {
+        continueAt = exchangePointsRequest.getParams().getContinueAt().intValue();
+      }
 
-			Collection<Agency> agencies = transitService()
-				.getAgencies()
-				.stream()
-				.filter(agency -> agency.getId().getFeedId().equals(stop.getId().getFeedId()))
-				.toList();
+      if (exchangePointsRequest.getParams().getNumberOfResults() != null) {
+        maxResults = exchangePointsRequest.getParams().getNumberOfResults().longValue();
+      }
 
-			String lang = agencies.iterator().next().getLang();
+      if (exchangePointsRequest.getParams().getPtModes() != null) {
+        modeList = exchangePointsRequest.getParams().getPtModes().getPtMode();
+        boolean excludeModes = exchangePointsRequest.getParams().getPtModes().isExclude();
+        for (VehicleModesOfTransportEnumeration mode : modeList) {
+          String otpMode = OJPCommon.convertOTPModes(mode);
+          if (otpMode != null) {
+            if (excludeModes == false) {
+              requestModes.add(otpMode);
+            } else {
+              allOTPModes.remove(otpMode);
+            }
+          }
+
+        }
+        if (excludeModes == true) {
+          requestModes.addAll(allOTPModes);
+        }
+      } else {
+        requestModes.addAll(allOTPModes);
+      }
+
+
+    }
+
+    List<Station> stations = new ArrayList<>();
+
+    if (stopCode != null) {
+      //search by id
+      try {
+        stations.add(station(stopCode));
+      } catch (NotFoundException e) {
+        //TODO ?
+        e.printStackTrace();
+      }
+    } else {
+      stations = transitService().getStations().stream().toList();
+    }
+
+
+    List<Station> stops = stations.stream().filter(station -> {
+      //filter by modes
+      if (!requestModes.isEmpty()) {
+
+        List<Route> routes = station.getChildStops().stream()
+          .flatMap(c -> transitService().getRoutesForStop(c).stream())
+          .distinct().toList();
+
+        List<VehicleModesOfTransportEnumeration> types = OJPCommon.getTraverseModes(new HashSet<>(routes));
+
+        if (Collections.disjoint(requestModes, types)) { //at list one mode must be in common
+          return false;
+        }
+      }
+
+      return true;
+    }).skip(continueAt).limit(maxResults).toList();
+
+    BigInteger mContinueAt = BigInteger.valueOf(continueAt + stops.size());
+
+    if (stops.isEmpty()) {
+      location.setStatus(false);
+      ServiceDeliveryErrorConditionStructure error = new ServiceDeliveryErrorConditionStructure();
+      ErrorDescriptionStructure descr = new ErrorDescriptionStructure();
+      descr.setValue("No Exchange Point");
+      location.setErrorCondition(error.withDescription(descr));
+      long timeEnd = System.currentTimeMillis();
+      location.setCalcTime(BigInteger.valueOf(timeEnd - timeStart));
+      return location;
+    } else {
+      location.setStatus(true);
+      if (stops.size() == maxResults) {
+        location.setContinueAt(mContinueAt);
+      }
+    }
+
+
+    for (Station stop : stops) {
+
+      Collection<Agency> agencies = transitService()
+        .getAgencies()
+        .stream()
+        .filter(agency -> agency.getId().getFeedId().equals(stop.getId().getFeedId()))
+        .toList();
+
+      String lang = agencies.iterator().next().getLang();
       assert lang != null;
       Locale locale = new Locale(lang);
 
 
-			PlaceStructure p = new PlaceStructure();
-			StopPlaceStructure sp = new StopPlaceStructure();
-			InternationalTextStructure it = new InternationalTextStructure();
-			NaturalLanguageStringStructure nL = new NaturalLanguageStringStructure();
-			nL.setLang(lang);
-			nL.setValue(stop.getName().toString(locale));
-			it.setText(nL);
-			sp.setStopPlaceName(it);
-			//sp.setWheelchairAccessible(stop == 1);
-			LocationStructure geo = new LocationStructure();
-			geo.setLatitude(BigDecimal.valueOf(stop.getLat()));
-			geo.setLongitude(BigDecimal.valueOf(stop.getLon()));
-			p.setGeoPosition(geo);
-			StopPlaceRefStructure sRef = new StopPlaceRefStructure();
-			sRef.setValue(stop.getCode());
-			sp.setStopPlaceRef(sRef );
-			
-			p.setStopPlace(sp);
-			p.setLocationName(it);
-			
-			
-			ExchangePointsResultStructure exchangePoint = new ExchangePointsResultStructure();
-			exchangePoint.setPlace(p);
+      PlaceStructure p = new PlaceStructure();
+      StopPlaceStructure sp = new StopPlaceStructure();
+      InternationalTextStructure it = new InternationalTextStructure();
+      NaturalLanguageStringStructure nL = new NaturalLanguageStringStructure();
+      nL.setLang(lang);
+      nL.setValue(stop.getName().toString(locale));
+      it.setText(nL);
+      sp.setStopPlaceName(it);
+      //sp.setWheelchairAccessible(stop == 1);
+      LocationStructure geo = new LocationStructure();
+      geo.setLatitude(BigDecimal.valueOf(stop.getLat()));
+      geo.setLongitude(BigDecimal.valueOf(stop.getLon()));
+      p.setGeoPosition(geo);
+      StopPlaceRefStructure sRef = new StopPlaceRefStructure();
+      sRef.setValue(stop.getCode());
+      sp.setStopPlaceRef(sRef);
 
-			List<Route> routes = stop.getChildStops().stream()
-				.flatMap(c -> transitService().getRoutesForStop(c).stream())
-				.distinct().toList();
-			
-			routes.stream().map(r -> r.getGtfsType()).distinct().forEach(type -> {
-				ModeStructure m = new ModeStructure();
-				switch(type) {
-					case 0: m.setPtMode(VehicleModesOfTransportEnumeration.TRAM); m.setTramSubmode(TramSubmodesOfTransportEnumeration.ALL_TRAM_SERVICES); break;
-					case 1: m.setPtMode(VehicleModesOfTransportEnumeration.METRO); m.setMetroSubmode(MetroSubmodesOfTransportEnumeration.ALL_RAIL_SERVICES); break;
-					case 2: m.setPtMode(VehicleModesOfTransportEnumeration.RAIL); m.setRailSubmode(RailSubmodesOfTransportEnumeration.ALL_RAIL_SERVICES); break;
-					case 3: m.setPtMode(VehicleModesOfTransportEnumeration.BUS); m.setBusSubmode(BusSubmodesOfTransportEnumeration.ALL_BUS_SERVICES); break;
-					case 4: m.setPtMode(VehicleModesOfTransportEnumeration.FERRY_SERVICE); m.setWaterSubmode(WaterSubmodesOfTransportEnumeration.ALL_WATER_TRANSPORT_SERVICES); break;
-					case 5: m.setPtMode(VehicleModesOfTransportEnumeration.TRAM); m.setTramSubmode(TramSubmodesOfTransportEnumeration.CITY_TRAM); break;
-					case 6: m.setPtMode(VehicleModesOfTransportEnumeration.TELECABIN); m.setTelecabinSubmode(TelecabinSubmodesOfTransportEnumeration.ALL_TELECABIN_SERVICES); break;
-					case 7: m.setPtMode(VehicleModesOfTransportEnumeration.FUNICULAR); m.setFunicularSubmode(FunicularSubmodesOfTransportEnumeration.ALL_FUNICULAR_SERVICES); break;
-					default: m.setPtMode(VehicleModesOfTransportEnumeration.UNKNOWN); break;
-				}
-				exchangePoint.getMode().add(m);
-			});
-			
-			location.getPlace().add(exchangePoint );
-		}
-		long timeEnd = System.currentTimeMillis();
-		location.setCalcTime(BigInteger.valueOf(timeEnd - timeStart));
-		return location;
-	}
+      p.setStopPlace(sp);
+      p.setLocationName(it);
 
-	private TransitService transitService() {
-		return this.serverRequestContext.transitService();
-	}
 
-	private Station station(String stationId) {
-		var station = transitService().getStationById(OJPCommon.createId("stationId", stationId));
-		return OJPCommon.validateExist("Station", station, "stationId", stationId);
-	}
+      ExchangePointsResultStructure exchangePoint = new ExchangePointsResultStructure();
+      exchangePoint.setPlace(p);
 
-	
+      List<Route> routes = stop.getChildStops().stream()
+        .flatMap(c -> transitService().getRoutesForStop(c).stream())
+        .distinct().toList();
+
+      routes.stream().map(r -> r.getMode()).distinct().forEach(type -> {
+        ModeStructure m = new ModeStructure();
+        switch (type) {
+          case TRAM:
+            m.setPtMode(VehicleModesOfTransportEnumeration.TRAM);
+            m.setTramSubmode(TramSubmodesOfTransportEnumeration.ALL_TRAM_SERVICES);
+            break;
+          case SUBWAY:
+            m.setPtMode(VehicleModesOfTransportEnumeration.METRO);
+            m.setMetroSubmode(MetroSubmodesOfTransportEnumeration.ALL_RAIL_SERVICES);
+            break;
+          case RAIL:
+            m.setPtMode(VehicleModesOfTransportEnumeration.RAIL);
+            m.setRailSubmode(RailSubmodesOfTransportEnumeration.ALL_RAIL_SERVICES);
+            break;
+          case BUS:
+            m.setPtMode(VehicleModesOfTransportEnumeration.BUS);
+            m.setBusSubmode(BusSubmodesOfTransportEnumeration.ALL_BUS_SERVICES);
+            break;
+          case FERRY:
+            m.setPtMode(VehicleModesOfTransportEnumeration.FERRY_SERVICE);
+            m.setWaterSubmode(WaterSubmodesOfTransportEnumeration.ALL_WATER_TRANSPORT_SERVICES);
+            break;
+          case CABLE_CAR:
+            m.setPtMode(VehicleModesOfTransportEnumeration.TRAM);
+            m.setTramSubmode(TramSubmodesOfTransportEnumeration.CITY_TRAM);
+            break;
+          case GONDOLA:
+            m.setPtMode(VehicleModesOfTransportEnumeration.TELECABIN);
+            m.setTelecabinSubmode(TelecabinSubmodesOfTransportEnumeration.ALL_TELECABIN_SERVICES);
+            break;
+          case FUNICULAR:
+            m.setPtMode(VehicleModesOfTransportEnumeration.FUNICULAR);
+            m.setFunicularSubmode(FunicularSubmodesOfTransportEnumeration.ALL_FUNICULAR_SERVICES);
+            break;
+          default:
+            m.setPtMode(VehicleModesOfTransportEnumeration.UNKNOWN);
+            break;
+        }
+        exchangePoint.getMode().add(m);
+      });
+
+      location.getPlace().add(exchangePoint);
+    }
+    long timeEnd = System.currentTimeMillis();
+    location.setCalcTime(BigInteger.valueOf(timeEnd - timeStart));
+    return location;
+  }
+
+  private TransitService transitService() {
+    return this.serverRequestContext.transitService();
+  }
+
+  private Station station(String stationId) {
+    var station = transitService().getStationById(OJPCommon.createId("stationId", stationId));
+    return OJPCommon.validateExist("Station", station, "stationId", stationId);
+  }
+
+
 }

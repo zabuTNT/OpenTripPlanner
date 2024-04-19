@@ -9,85 +9,68 @@ import java.util.Set;
 import org.locationtech.jts.geom.Coordinate;
 import org.opentripplanner.ext.restapi.mapping.FeedScopedIdMapper;
 import org.opentripplanner.framework.geometry.EncodedPolyline;
+import org.opentripplanner.transit.model.basic.SubMode;
+import org.opentripplanner.transit.model.basic.TransitMode;
 import org.opentripplanner.transit.model.framework.FeedScopedId;
 import org.opentripplanner.transit.model.network.Route;
 import java.util.stream.Collectors;
 
 public class OJPCommon {
 
-  public List<String> allOTPModes = Arrays.asList("TRAM","SUBWAY","RAIL","BUS","FERRY","GONDOLA","FUNICULAR");
   public static String convertOTPModes(VehicleModesOfTransportEnumeration ojpMode) {
-    switch(ojpMode) {
-      case RAIL: return "RAIL";
-      case BUS: return "BUS";
-      case METRO: return "SUBWAY";
-      case TRAM: return "TRAM";
+    switch (ojpMode) {
+      case RAIL:
+        return "RAIL";
+      case BUS:
+        return "BUS";
+      case METRO:
+        return "SUBWAY";
+      case TRAM:
+        return "TRAM";
       case WATER_TRANSPORT:
       case FERRY_SERVICE:
         return "FERRY";
-      case TELECABIN: return "GONDOLA";
-      case FUNICULAR: return "FUNICULAR";
-      default: return null;
+      case TELECABIN:
+        return "GONDOLA";
+      case FUNICULAR:
+        return "FUNICULAR";
+      default:
+        return null;
     }
   }
-  public static VehicleModesOfTransportEnumeration convertOJPModes(int routeType) {
-    if (routeType >= 100 && routeType < 200) { // Railway Service
-      return VehicleModesOfTransportEnumeration.RAIL;
-    } else if (routeType >= 200 && routeType < 300) { //Coach Service
-      return VehicleModesOfTransportEnumeration.BUS;
-    } else if (routeType >= 300
-      && routeType < 500) { //Suburban Railway Service and Urban Railway service
-      if (routeType >= 401 && routeType <= 402) {
-        return VehicleModesOfTransportEnumeration.METRO;
-      }
-      return VehicleModesOfTransportEnumeration.RAIL;
-    } else if (routeType >= 500 && routeType < 700) { //Metro Service and Underground Service
-      return VehicleModesOfTransportEnumeration.METRO;
-    } else if (routeType >= 700 && routeType < 900) { //Bus Service and Trolleybus service
-      return VehicleModesOfTransportEnumeration.BUS;
-    } else if (routeType >= 900 && routeType < 1000) { //Tram service
-      return VehicleModesOfTransportEnumeration.TRAM;
-    } else if (routeType >= 1000 && routeType < 1100) { //Water Transport Service
-      return VehicleModesOfTransportEnumeration.WATER_TRANSPORT;
-    } else if (routeType >= 1100 && routeType < 1200) { //Air Service
-      return VehicleModesOfTransportEnumeration.AIR;
-    } else if (routeType >= 1200 && routeType < 1300) { //Ferry Service
-      return VehicleModesOfTransportEnumeration.FERRY_SERVICE;
-    } else if (routeType >= 1300 && routeType < 1400) { //Telecabin Service
-      return VehicleModesOfTransportEnumeration.TELECABIN;
-    } else if (routeType >= 1400 && routeType < 1500) { //Funicalar Service
-      return VehicleModesOfTransportEnumeration.FUNICULAR;
-    }
-    /* Original GTFS route types. Should these be checked before TPEG types? */
+
+  public static VehicleModesOfTransportEnumeration convertOJPModes(TransitMode routeType) {
     switch (routeType) {
-      case 0:
-        return VehicleModesOfTransportEnumeration.TRAM;
-      case 1:
-        return VehicleModesOfTransportEnumeration.METRO;
-      case 2:
+      case TransitMode.RAIL:
         return VehicleModesOfTransportEnumeration.RAIL;
-      case 3:
+      case TransitMode.BUS:
         return VehicleModesOfTransportEnumeration.BUS;
-      case 4:
-        return VehicleModesOfTransportEnumeration.FERRY_SERVICE;
-      case 5:
+      case TransitMode.SUBWAY:
+        return VehicleModesOfTransportEnumeration.METRO;
+      case TransitMode.TRAM:
         return VehicleModesOfTransportEnumeration.TRAM;
-      case 6:
+      case TransitMode.FERRY:
+        return VehicleModesOfTransportEnumeration.WATER_TRANSPORT;
+      case TransitMode.GONDOLA:
         return VehicleModesOfTransportEnumeration.TELECABIN;
-      case 7:
+      case TransitMode.FUNICULAR:
         return VehicleModesOfTransportEnumeration.FUNICULAR;
+      case AIRPLANE:
+        return VehicleModesOfTransportEnumeration.AIR;
+      case TAXI:
+        return VehicleModesOfTransportEnumeration.TAXI;
       default:
         return VehicleModesOfTransportEnumeration.UNKNOWN;
     }
   }
 
   public static VehicleModesOfTransportEnumeration getTraverseMode(Route route) {
-    int routeType = route.getGtfsType();
+    TransitMode routeType = route.getMode();
     return convertOJPModes(routeType);
   }
 
   public static List<VehicleModesOfTransportEnumeration> getTraverseModes(Set<Route> routes) {
-    return routes.stream().map(r -> getTraverseMode(r)).distinct().collect(Collectors.toList());
+    return routes.stream().map(OJPCommon::getTraverseMode).distinct().collect(Collectors.toList());
   }
 
   public static <T> T validateExist(String eName, T entity, String keyLabel, Object key) {
