@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -305,11 +306,9 @@ public class OJPStopEventsFactory {
 				DatedJourneyStructure js = new DatedJourneyStructure();
 				
 				OperatingDayRefStructure op = new OperatingDayRefStructure();
-				String pattern = "yyyy-MM-dd";
-				SimpleDateFormat simpleDateFormat = new SimpleDateFormat(pattern);
+				DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+				op.setValue(tts.getServiceDay().format(dateTimeFormatter));
 
-				op.setValue(simpleDateFormat.format(tts.getServiceDay()));
-				
 				js.getContent().add(factory.createOperatingDayRef(op));
 				
 				JourneyRefStructure jr = new JourneyRefStructure();

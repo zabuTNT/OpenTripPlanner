@@ -4,7 +4,9 @@ import de.vdv.ojp.model.VehicleModesOfTransportEnumeration;
 import jakarta.ws.rs.NotFoundException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.locationtech.jts.geom.Coordinate;
 import org.opentripplanner.ext.restapi.mapping.FeedScopedIdMapper;
@@ -62,6 +64,21 @@ public class OJPCommon {
       default:
         return VehicleModesOfTransportEnumeration.UNKNOWN;
     }
+  }
+
+  public static Map<String,Object> mapGenericLocationFromCoordinates(double lng, double lat) {
+    Map<String,Object> map = new HashMap<>();
+    Map<String,Object> coordinates = new HashMap<>();
+    coordinates.put("latitude", lat);
+    coordinates.put("longitude", lng);
+    map.put("coordinates",coordinates);
+    return map;
+  }
+
+  public static Map<String,Object> mapGenericLocationFromPlaceRef(String placeRef) {
+    Map<String,Object> map = new HashMap<>();
+    map.put("place",placeRef);
+    return map;
   }
 
   public static VehicleModesOfTransportEnumeration getTraverseMode(Route route) {

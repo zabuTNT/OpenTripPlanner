@@ -203,7 +203,7 @@ public class OJPExchangePointFactory {
         .flatMap(c -> transitService().getRoutesForStop(c).stream())
         .distinct().toList();
 
-      routes.stream().map(r -> r.getMode()).distinct().forEach(type -> {
+      routes.stream().map(Route::getMode).distinct().forEach(type -> {
         ModeStructure m = new ModeStructure();
         switch (type) {
           case TRAM:

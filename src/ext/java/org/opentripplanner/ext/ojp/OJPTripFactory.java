@@ -149,8 +149,8 @@ public class OJPTripFactory {
   private boolean includeTrack = false;
 //	private boolean includeProjection = false;
 
-  long transferLimit = Integer.MAX_VALUE;
-  long maxResults = Integer.MAX_VALUE;
+  int transferLimit = Integer.MAX_VALUE;
+  int maxResults = Integer.MAX_VALUE;
 
   private ObjectFactory factory;
 
@@ -244,14 +244,14 @@ public class OJPTripFactory {
       }
 
       if (request.getParams().getNumberOfResults() != null) {
-        maxResults = request.getParams().getNumberOfResults().longValue();
+        maxResults = request.getParams().getNumberOfResults().intValue();
       }
       if (request.getParams().isIncludeTrackSections() != null) {
         includeTrack = request.getParams().isIncludeTrackSections();
       }
 
       if (request.getParams().getTransferLimit() != null) {
-        transferLimit = request.getParams().getTransferLimit().longValue();
+        transferLimit = request.getParams().getTransferLimit().intValue();
       }
 
       if (request.getParams().isIncludeIntermediateStops() != null) {
@@ -363,8 +363,11 @@ public class OJPTripFactory {
           }
         }
       }
-      map.put("placeIds", stopsVia);
-      viaStops.add(map);
+
+      if(!stopsVia.isEmpty()){
+        map.put("placeIds", stopsVia);
+        viaStops.add(map);
+      }
     }
 
     if (request.getNotVia() != null) {
@@ -402,23 +405,24 @@ public class OJPTripFactory {
 
     Map<String, Object> requestMap = new HashMap<String, Object>();
 
+    System.out.println("Origin -> "+originStop);
+    System.out.println("Destination -> "+destinationStop);
+
     if (originStop != null) {
-      String[] originSplitted = originStop.split("_");
-      requestMap.put("to", GenericLocation.fromStopId("", originSplitted[0], originSplitted[1]));
+      requestMap.put("from", OJPCommon.mapGenericLocationFromPlaceRef(originStop));
     } else {
-      requestMap.put("from", toGenericLocation(originLng.doubleValue(), originLat.doubleValue()));
+      requestMap.put("from", OJPCommon.mapGenericLocationFromCoordinates(originLng.doubleValue(), originLat.doubleValue()));
     }
     if (destinationStop != null) {
-      String[] destinationSplitted = destinationStop.split("_");
-      requestMap.put("to", GenericLocation.fromStopId("", destinationSplitted[0], destinationSplitted[1]));
+      requestMap.put("to", OJPCommon.mapGenericLocationFromPlaceRef(destinationStop));
     } else {
-      requestMap.put("from", toGenericLocation(destinationLng.doubleValue(), destinationLat.doubleValue()));
+      requestMap.put("to", OJPCommon.mapGenericLocationFromCoordinates(destinationLng.doubleValue(), destinationLat.doubleValue()));
     }
 
     if (departureTime != null) {
-      requestMap.put("dateTime", departureTime);
+      requestMap.put("dateTime", departureTime.toEpochSecond() * 1000);
     } else {
-      requestMap.put("dateTime", arrivalTime);
+      requestMap.put("dateTime", arrivalTime.toEpochSecond() * 1000);
       requestMap.put("arriveBy", true);
     }
 
@@ -618,42 +622,43 @@ public class OJPTripFactory {
                     .withLatitude(BigDecimal.valueOf(from.lat))
                     .withLongitude(BigDecimal.valueOf(from.lon))));
 
+            if(leg.intermediateStops != null){
+              for (ApiPlace stop : leg.intermediateStops) {
+                sequence += 1;
+                if (includeIntermediateStops) {
+                  LegIntermediateStructure intermediateStop = new LegIntermediateStructure();
+                  intermediateStop.setOrder(BigInteger.valueOf(sequence));
+                  intermediateStop.setStopPointRef(new StopPointRefStructure().withValue(stop.stopId));
 
-            for (ApiPlace stop : leg.intermediateStops) {
-              sequence += 1;
-              if (includeIntermediateStops) {
-                LegIntermediateStructure intermediateStop = new LegIntermediateStructure();
-                intermediateStop.setOrder(BigInteger.valueOf(sequence));
-                intermediateStop.setStopPointRef(new StopPointRefStructure().withValue(stop.stopId));
 
+                  intermediateStop.setStopPointName(getInternationName(stop.name, lang));
 
-                intermediateStop.setStopPointName(getInternationName(stop.name, lang));
+                  intermediateStop.setServiceArrival(
+                    new LegIntermediateStructure.ServiceArrival()
+                      .withTimetabledTime(toLocalDateTime(stop.arrival).atZone(zone))
+                      .withEstimatedTime(toLocalDateTime(stop.arrival).plusSeconds(leg.arrivalDelay).atZone(zone))
+                  );
+                  intermediateStop.setServiceDeparture(
+                    new LegIntermediateStructure.ServiceDeparture()
+                      .withTimetabledTime(toLocalDateTime(stop.departure).atZone(zone))
+                      .withEstimatedTime(toLocalDateTime(stop.departure).plusSeconds(leg.departureDelay).atZone(zone))
+                  );
 
-                intermediateStop.setServiceArrival(
-                  new LegIntermediateStructure.ServiceArrival()
-                    .withTimetabledTime(toLocalDateTime(stop.arrival).atZone(zone))
-                    .withEstimatedTime(toLocalDateTime(stop.arrival).plusSeconds(leg.arrivalDelay).atZone(zone))
-                );
-                intermediateStop.setServiceDeparture(
-                  new LegIntermediateStructure.ServiceDeparture()
-                    .withTimetabledTime(toLocalDateTime(stop.departure).atZone(zone))
-                    .withEstimatedTime(toLocalDateTime(stop.departure).plusSeconds(leg.departureDelay).atZone(zone))
-                );
-
-                timedLeg.getLegIntermediates().add(intermediateStop);
-                allMyPlaces.add(
-                  new PlaceStructure()
-                    .withLocationName(getInternationName(stop.name, lang))
-                    .withStopPoint(new StopPointStructure()
-                      .withStopPointRef(
-                        new StopPointRefStructure().withValue(stop.stopId)
+                  timedLeg.getLegIntermediates().add(intermediateStop);
+                  allMyPlaces.add(
+                    new PlaceStructure()
+                      .withLocationName(getInternationName(stop.name, lang))
+                      .withStopPoint(new StopPointStructure()
+                        .withStopPointRef(
+                          new StopPointRefStructure().withValue(stop.stopId)
+                        )
+                        .withStopPointName(getInternationName(stop.name, lang))
                       )
-                      .withStopPointName(getInternationName(stop.name, lang))
-                    )
-                    .withGeoPosition(
-                      new LocationStructure()
-                        .withLatitude(BigDecimal.valueOf(stop.lat))
-                        .withLongitude(BigDecimal.valueOf(stop.lon))));
+                      .withGeoPosition(
+                        new LocationStructure()
+                          .withLatitude(BigDecimal.valueOf(stop.lat))
+                          .withLongitude(BigDecimal.valueOf(stop.lon))));
+                }
               }
             }
 
@@ -824,13 +829,14 @@ public class OJPTripFactory {
       trip.setTripResponseContext(context);
 
     } catch (Exception e) {
+      e.printStackTrace();
       ServiceDeliveryErrorConditionStructure errorS = new ServiceDeliveryErrorConditionStructure();
       ErrorDescriptionStructure descr = new ErrorDescriptionStructure();
       descr.setValue("Error"); //TODO: fix with a the real error, or codes (!?)
       trip.setStatus(false);
       trip.setErrorCondition(errorS.withDescription(descr));
     } catch (Throwable t) {
-      System.out.printf("Unchecked error while planning path: ", t);
+      t.printStackTrace();
       trip.setStatus(false);
       ServiceDeliveryErrorConditionStructure error = new ServiceDeliveryErrorConditionStructure();
       ErrorDescriptionStructure descr = new ErrorDescriptionStructure();
@@ -861,10 +867,6 @@ public class OJPTripFactory {
 
   private static LocalDateTime toLocalDateTime(Calendar calendar) {
     return LocalDateTime.ofInstant(calendar.toInstant(), ZoneId.systemDefault());
-  }
-
-  private GenericLocation toGenericLocation(double lng, double lat) {
-    return new GenericLocation(lat, lng);
   }
 
   private RouteRequest createRequest(Map<String, Object> requestMap) {

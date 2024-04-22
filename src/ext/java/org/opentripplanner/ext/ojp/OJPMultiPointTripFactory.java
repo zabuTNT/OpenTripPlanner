@@ -142,6 +142,7 @@ public class OJPMultiPointTripFactory {
   List<String> allOTPModes = Arrays.asList("TRAM", "SUBWAY", "RAIL", "BUS", "FERRY", "GONDOLA", "FUNICULAR");
 
 
+
   public OJPMultiPointTripFactory(OtpServerRequestContext serverRequestContext, OJPMultiPointTripRequestStructure request, ObjectFactory factory) {
     this.serverRequestContext = serverRequestContext;
     this.request = request;
@@ -308,8 +309,10 @@ public class OJPMultiPointTripFactory {
           }
         }
       }
-      map.put("placeIds", stopsVia);
-      viaStops.add(map);
+      if(!stopsVia.isEmpty()){
+        map.put("placeIds", stopsVia);
+        viaStops.add(map);
+      }
     }
 
     if (request.getNotVia() != null) {
@@ -387,22 +390,20 @@ public class OJPMultiPointTripFactory {
         Map<String, Object> requestMap = new HashMap<String, Object>();
 
         if (originStop != null) {
-          String[] originSplitted = originStop.split("_");
-          requestMap.put("to", GenericLocation.fromStopId("", originSplitted[0], originSplitted[1]));
+          requestMap.put("from", OJPCommon.mapGenericLocationFromPlaceRef(originStop));
         } else {
-          requestMap.put("from", toGenericLocation(originLng.doubleValue(), originLat.doubleValue()));
+          requestMap.put("from", OJPCommon.mapGenericLocationFromCoordinates(originLng.doubleValue(), originLat.doubleValue()));
         }
         if (destinationStop != null) {
-          String[] destinationSplitted = destinationStop.split("_");
-          requestMap.put("to", GenericLocation.fromStopId("", destinationSplitted[0], destinationSplitted[1]));
+          requestMap.put("to", OJPCommon.mapGenericLocationFromPlaceRef(destinationStop));
         } else {
-          requestMap.put("from", toGenericLocation(destinationLng.doubleValue(), destinationLat.doubleValue()));
+          requestMap.put("to", OJPCommon.mapGenericLocationFromCoordinates(destinationLng.doubleValue(), destinationLat.doubleValue()));
         }
 
         if (departureTime != null) {
-          requestMap.put("dateTime", departureTime);
+          requestMap.put("dateTime", departureTime.toEpochSecond() * 1000);
         } else {
-          requestMap.put("dateTime", arrivalTime);
+          requestMap.put("dateTime", arrivalTime.toEpochSecond() * 1000);
           requestMap.put("arriveBy", true);
         }
 
@@ -597,44 +598,46 @@ public class OJPMultiPointTripFactory {
                         .withLatitude(BigDecimal.valueOf(from.lat))
                         .withLongitude(BigDecimal.valueOf(from.lon))));
 
+                if(leg.intermediateStops != null){
+                  for (ApiPlace stop : leg.intermediateStops) {
+                    sequence += 1;
+                    if (includeIntermediateStops) {
+                      LegIntermediateStructure intermediateStop = new LegIntermediateStructure();
+                      intermediateStop.setOrder(BigInteger.valueOf(sequence));
+                      intermediateStop.setStopPointRef(new StopPointRefStructure().withValue(stop.stopId.toString()));
 
-                for (ApiPlace stop : leg.intermediateStops) {
-                  sequence += 1;
-                  if (includeIntermediateStops) {
-                    LegIntermediateStructure intermediateStop = new LegIntermediateStructure();
-                    intermediateStop.setOrder(BigInteger.valueOf(sequence));
-                    intermediateStop.setStopPointRef(new StopPointRefStructure().withValue(stop.stopId.toString()));
 
+                      intermediateStop.setStopPointName(getInternationName(stop.name, lang));
 
-                    intermediateStop.setStopPointName(getInternationName(stop.name, lang));
+                      intermediateStop.setServiceArrival(
+                        new LegIntermediateStructure.ServiceArrival()
+                          .withTimetabledTime(toLocalDateTime(stop.arrival).atZone(zone))
+                          .withEstimatedTime(toLocalDateTime(stop.arrival).plusSeconds(leg.arrivalDelay).atZone(zone))
+                      );
+                      intermediateStop.setServiceDeparture(
+                        new LegIntermediateStructure.ServiceDeparture()
+                          .withTimetabledTime(toLocalDateTime(stop.departure).atZone(zone))
+                          .withEstimatedTime(toLocalDateTime(stop.departure).plusSeconds(leg.departureDelay).atZone(zone))
+                      );
 
-                    intermediateStop.setServiceArrival(
-                      new LegIntermediateStructure.ServiceArrival()
-                        .withTimetabledTime(toLocalDateTime(stop.arrival).atZone(zone))
-                        .withEstimatedTime(toLocalDateTime(stop.arrival).plusSeconds(leg.arrivalDelay).atZone(zone))
-                    );
-                    intermediateStop.setServiceDeparture(
-                      new LegIntermediateStructure.ServiceDeparture()
-                        .withTimetabledTime(toLocalDateTime(stop.departure).atZone(zone))
-                        .withEstimatedTime(toLocalDateTime(stop.departure).plusSeconds(leg.departureDelay).atZone(zone))
-                    );
-
-                    timedLeg.getLegIntermediates().add(intermediateStop);
-                    allMyPlaces.add(
-                      new PlaceStructure()
-                        .withLocationName(getInternationName(stop.name, lang))
-                        .withStopPoint(new StopPointStructure()
-                          .withStopPointRef(
-                            new StopPointRefStructure().withValue(stop.stopId.toString())
+                      timedLeg.getLegIntermediates().add(intermediateStop);
+                      allMyPlaces.add(
+                        new PlaceStructure()
+                          .withLocationName(getInternationName(stop.name, lang))
+                          .withStopPoint(new StopPointStructure()
+                            .withStopPointRef(
+                              new StopPointRefStructure().withValue(stop.stopId.toString())
+                            )
+                            .withStopPointName(getInternationName(stop.name, lang))
                           )
-                          .withStopPointName(getInternationName(stop.name, lang))
-                        )
-                        .withGeoPosition(
-                          new LocationStructure()
-                            .withLatitude(BigDecimal.valueOf(stop.lat))
-                            .withLongitude(BigDecimal.valueOf(stop.lon))));
+                          .withGeoPosition(
+                            new LocationStructure()
+                              .withLatitude(BigDecimal.valueOf(stop.lat))
+                              .withLongitude(BigDecimal.valueOf(stop.lon))));
+                    }
                   }
                 }
+
 
                 alight.setStopPointRef(new StopPointRefStructure().withValue(to.stopId.toString()));
 
@@ -844,9 +847,7 @@ public class OJPMultiPointTripFactory {
     return LocalDateTime.ofInstant(calendar.toInstant(), ZoneId.systemDefault());
   }
 
-  private GenericLocation toGenericLocation(double lng, double lat) {
-    return new GenericLocation(lat, lng);
-  }
+
 
   private TransitService transitService() {
     return this.serverRequestContext.transitService();
